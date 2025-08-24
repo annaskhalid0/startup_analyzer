@@ -28,7 +28,7 @@ class GroqClient:
             )
         
         self.client = Groq(api_key=self.api_key)
-        self.model = "llama-3.1-70b-versatile"
+        self.model = "llama-3.3-70b-versatile"
         
         logger.info(f"🚀 Groq client initialized with key: {self.api_key[:8]}...{self.api_key[-4:]}")
 
