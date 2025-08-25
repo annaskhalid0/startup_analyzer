@@ -24,7 +24,7 @@ from prompt import (
     validate_startup_data,
     format_evaluation_response
 )
-from groq import get_groq_client, test_groq_setup
+from my_groq import get_groq_client, test_groq_setup
 
 # Setup logging
 logging.basicConfig(

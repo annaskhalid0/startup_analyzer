@@ -1,0 +1,11 @@
+[theme]
+primaryColor="#6366f1"          # Main accent (indigo/purple)
+backgroundColor="#0f172a"       # Dark background (slate-900)
+secondaryBackgroundColor="#1e293b" 
+textColor="#f8fafc"             # Almost white text
+font="sans serif"
+
+
+[server]
+port = 8501
+enableXsrfProtection = true
