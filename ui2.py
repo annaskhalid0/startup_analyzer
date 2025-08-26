@@ -7,6 +7,336 @@ from datetime import datetime
 # Configuration
 API_BASE_URL = "http://52.4.244.178:8000"  # Change to your deployed URL
 
+# IMMEDIATE CSS injection to prevent blue flash + Enhanced animations
+st.markdown("""
+<style>
+/* Immediate background override */
+html, body, .stApp, [data-testid="stAppViewContainer"], .main, .block-container {
+    background-color: #FAF9F6 !important;
+}
+
+/* Enhanced Header Styling */
+.animated-header {
+    background: linear-gradient(135deg, #3D5A40 0%, #5A7C65 50%, #3D5A40 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 4s ease infinite;
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    margin: 20px auto;
+    max-width: 900px;
+    box-shadow: 0 10px 30px rgba(61, 90, 64, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.animated-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 3s infinite;
+    transform: rotate(45deg);
+}
+
+.header-title {
+    color: white !important;
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    animation: titlePulse 2s ease-in-out infinite alternate;
+    position: relative;
+    z-index: 2;
+}
+
+.header-subtitle {
+    color: rgba(255,255,255,0.9) !important;
+    font-size: 1.1rem;
+    margin: 10px 0 0 0;
+    font-weight: 500;
+    animation: subtitleFade 3s ease-in-out infinite alternate;
+    position: relative;
+    z-index: 2;
+}
+
+/* Floating AI Elements */
+.ai-elements {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ai-particle {
+    position: absolute;
+    color: rgba(255,255,255,0.6);
+    font-size: 1.2rem;
+    animation: float 6s ease-in-out infinite;
+}
+
+.ai-particle:nth-child(1) {
+    top: 20%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.ai-particle:nth-child(2) {
+    top: 60%;
+    right: 15%;
+    animation-delay: 2s;
+}
+
+.ai-particle:nth-child(3) {
+    bottom: 30%;
+    left: 20%;
+    animation-delay: 4s;
+}
+
+.ai-particle:nth-child(4) {
+    top: 40%;
+    right: 25%;
+    animation-delay: 1s;
+}
+
+/* Background AI Animation */
+.ai-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.05;
+}
+
+.ai-circuit {
+    position: absolute;
+    width: 2px;
+    height: 100px;
+    background: linear-gradient(to bottom, transparent, #3D5A40, transparent);
+    animation: circuitFlow 4s linear infinite;
+}
+
+.ai-circuit:nth-child(1) {
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.ai-circuit:nth-child(2) {
+    left: 30%;
+    animation-delay: 1s;
+}
+
+.ai-circuit:nth-child(3) {
+    left: 50%;
+    animation-delay: 2s;
+}
+
+.ai-circuit:nth-child(4) {
+    left: 70%;
+    animation-delay: 3s;
+}
+
+.ai-circuit:nth-child(5) {
+    left: 90%;
+    animation-delay: 0.5s;
+}
+
+/* Startup screen styles */
+.startup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #FAF9F6 !important;
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.ai-animation {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 30px;
+    position: relative;
+}
+
+.ai-circle {
+    width: 120px;
+    height: 120px;
+    border: 4px solid #3D5A40;
+    border-radius: 50%;
+    position: relative;
+    animation: rotate 2s linear infinite;
+}
+
+.ai-circle::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 4px solid transparent;
+    border-top: 4px solid #D97D54;
+    border-radius: 50%;
+    animation: rotate 1.5s linear infinite reverse;
+}
+
+.ai-brain {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.startup-title {
+    color: #3D5A40 !important;
+    font-size: 42px;
+    font-weight: 800;
+    margin: 20px 0;
+    letter-spacing: 2px;
+    animation: fadeInUp 1s ease-out 0.5s both;
+}
+
+.startup-subtitle {
+    color: #2C2C2C !important;
+    font-size: 18px;
+    opacity: 0.8;
+    animation: fadeInUp 1s ease-out 1s both;
+}
+
+.loading-dots {
+    display: inline-block;
+    animation: fadeInUp 1s ease-out 1.5s both;
+}
+
+.loading-dots span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #3D5A40;
+    margin: 0 2px;
+    animation: bounce 1.4s ease-in-out infinite both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+.loading-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.1); }
+}
+
+@keyframes fadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+
+.fade-out {
+    animation: fadeOut 0.8s ease-out forwards;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; visibility: hidden; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize session state for startup screen
+if 'startup_screen_shown' not in st.session_state:
+    st.session_state.startup_screen_shown = False
+
+# Show startup screen BEFORE anything else
+if not st.session_state.startup_screen_shown:
+    # Create startup screen
+    startup_container = st.empty()
+    
+    with startup_container.container():
+        st.markdown("""
+        <div class="startup-overlay" id="startupScreen">
+            <div class="ai-animation">
+                <div class="ai-circle">
+                    <div class="ai-brain">🧠</div>
+                </div>
+            </div>
+            <h1 class="startup-title">AI STARTUP ANALYZER</h1>
+            <p class="startup-subtitle">Powered by Advanced AI • Analyzing Your Vision</p>
+            <div class="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Wait for 3 seconds
+    time.sleep(3)
+    
+    # Fade out and clear
+    st.markdown("""
+    <script>
+    const startupScreen = document.getElementById('startupScreen');
+    if (startupScreen) {
+        startupScreen.classList.add('fade-out');
+        setTimeout(() => {
+            startupScreen.style.display = 'none';
+        }, 800);
+    }
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Clear the startup screen
+    startup_container.empty()
+    
+    # Mark as shown and rerun to show main app
+    st.session_state.startup_screen_shown = True
+    st.rerun()
+
+#CSS file connection
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+local_css("assets/style.css")
+
 st.set_page_config(
     page_title="AI Startup Evaluation System",
     page_icon="🚀",
@@ -15,8 +345,31 @@ st.set_page_config(
 )
 
 def main():
-    st.title("🚀 AI Startup Evaluation System")
-    st.markdown("**Hybrid AI Pipeline: Fine-tuned Models + Groq Llama 70B Enhancement**")
+    # Add background AI animation
+    st.markdown("""
+    <div class="ai-background">
+        <div class="ai-circuit"></div>
+        <div class="ai-circuit"></div>
+        <div class="ai-circuit"></div>
+        <div class="ai-circuit"></div>
+        <div class="ai-circuit"></div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Replace the old title with animated header
+    st.markdown("""
+    <div class="animated-header">
+        <div class="ai-elements">
+            <div class="ai-particle">🤖</div>
+            <div class="ai-particle">⚡</div>
+            <div class="ai-particle">🧠</div>
+            <div class="ai-particle">🚀</div>
+        </div>
+        <h1 class="header-title">🚀 AI Startup Evaluation System</h1>
+        <p class="header-subtitle">Hybrid AI Pipeline: Fine-tuned Models + Groq Llama 70B Enhancement</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
     
     # Sidebar
@@ -199,98 +552,72 @@ def generate_questions_flow(name, industry, pitch, founded_year, funding):
                 
             else:
                 error_detail = response.json().get("detail", "Unknown error")
-                st.error(f"❌ Error generating questions: {error_detail}")
+                st.error(f"❌ Question generation failed: {error_detail}")
                 
         except requests.exceptions.Timeout:
-            st.error("⏱️ Request timed out. The models might be loading. Please try again.")
+            st.error("⏱️ Request timed out. The AI might be processing a complex request.")
         except Exception as e:
-            st.error(f"❌ Request failed: {str(e)}")
+            st.error(f"❌ Question generation failed: {str(e)}")
 
 def display_startup_summary():
-    """Display startup summary"""
+    """Display startup information summary"""
     st.header("📊 Startup Summary")
+    
     info = st.session_state.startup_info
     
-    st.markdown(f"""
-    **Company:** {info['name']}  
-    **Industry:** {info['industry']}  
-    **Founded:** {info['founded_year']}  
-    **Funding:** {info['funding']}  
+    st.markdown(f"**🏢 Name:** {info['name']}")
+    st.markdown(f"**🏭 Industry:** {info['industry']}")
+    st.markdown(f"**📅 Founded:** {info['founded_year']}")
+    st.markdown(f"**💰 Funding:** {info['funding']}")
     
-    **Pitch:**  
-    {info['pitch']}
-    """)
+    with st.expander("📝 Full Pitch"):
+        st.write(info['pitch'])
     
-    # Show questions if generated
+    # Questions status
     if st.session_state.questions:
-        with st.expander(f"📝 Generated Questions ({len(st.session_state.questions)})"):
+        st.success(f"✅ {len(st.session_state.questions)} questions generated")
+        
+        with st.expander("👀 Preview Questions"):
             for i, q in enumerate(st.session_state.questions, 1):
-                st.write(f"**{i}.** {q}")
+                st.write(f"{i}. {q}")
+    else:
+        st.info("⏳ Generate questions to proceed")
 
 def step2_answer_questions(enhance_evaluation):
     """Step 2: Answer questions"""
     st.markdown("---")
     st.header("❓ Step 2: Answer Questions")
-    st.markdown("*Please provide detailed, honest answers. Include specific metrics and data where possible.*")
     
-    answers = []
+    st.info("💡 Provide detailed answers for better evaluation quality")
     
-    with st.form("answer_form"):
-        # Create tabs for better organization
-        if len(st.session_state.questions) >= 7:
-            tab1, tab2 = st.tabs(["💼 VC Questions (1-7)", "🏭 Industry Questions (8-10)"])
+    with st.form("questions_form"):
+        answers = []
+        
+        for i, question in enumerate(st.session_state.questions, 1):
+            st.subheader(f"Question {i}")
+            st.write(question)
             
-            with tab1:
-                for i, question in enumerate(st.session_state.questions[:7], 1):
-                    st.markdown(f"**Question {i}:**")
-                    answer = st.text_area(
-                        question,
-                        key=f"vc_q_{i}",
-                        placeholder="Provide a detailed answer with specific examples and metrics...",
-                        height=100
-                    )
-                    answers.append(answer)
-            
-            with tab2:
-                for i, question in enumerate(st.session_state.questions[7:], 8):
-                    st.markdown(f"**Question {i}:**")
-                    answer = st.text_area(
-                        question,
-                        key=f"ind_q_{i}",
-                        placeholder="Provide a detailed answer with specific examples and metrics...",
-                        height=100
-                    )
-                    answers.append(answer)
-        else:
-            # If less than 7 questions, show all in one section
-            for i, question in enumerate(st.session_state.questions, 1):
-                st.markdown(f"**Question {i}:**")
-                answer = st.text_area(
-                    question,
-                    key=f"q_{i}",
-                    placeholder="Provide a detailed answer with specific examples and metrics...",
-                    height=100
-                )
-                answers.append(answer)
+            answer = st.text_area(
+                f"Your answer:",
+                key=f"answer_{i}",
+                height=100,
+                placeholder="Provide a detailed answer..."
+            )
+            answers.append(answer)
         
-        st.markdown("---")
-        
-        col1_eval, col2_eval, col3_eval = st.columns([2, 1, 1])
-        
-        with col1_eval:
-            evaluate = st.form_submit_button("🎯 Generate Evaluation Report", use_container_width=True)
-        
+        submitted = st.form_submit_button("🚀 Generate Evaluation", use_container_width=True)
     
-    if evaluate:
-        # Check if all questions are answered
-        unanswered = [i+1 for i, ans in enumerate(answers) if not ans.strip()]
-        if unanswered:
-            st.warning(f"⚠️ Please answer questions: {', '.join(map(str, unanswered))}")
+    if submitted:
+        # Validate answers
+        empty_answers = [i+1 for i, ans in enumerate(answers) if not ans.strip()]
+        
+        if empty_answers:
+            st.error(f"⚠️ Please answer all questions. Missing answers for questions: {', '.join(map(str, empty_answers))}")
         else:
-            evaluate_startup_flow(answers, enhance_evaluation)
+            generate_evaluation(answers, enhance_evaluation)
 
-def evaluate_startup_flow(answers, enhance_evaluation):
-    """Handle startup evaluation flow"""
+def generate_evaluation(answers, enhance_evaluation):
+    """Generate startup evaluation"""
     evaluation_data = {
         "startup": st.session_state.startup_info,
         "questions": st.session_state.questions,
