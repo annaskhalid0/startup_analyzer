@@ -2,7 +2,19 @@ import streamlit as st
 import requests
 import json
 import time
+import pandas as pd
+import re
 from datetime import datetime
+from io import BytesIO
+try:
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
 
 # Configuration
 API_BASE_URL = "http://52.4.244.178:8000"  # Change to your deployed URL
@@ -709,59 +721,499 @@ def step3_display_results():
     with tab3:
         display_qa_summary()
 
+# Add these helper functions before display_final_report
+def parse_evaluation_to_table(evaluation_text):
+    """Parse evaluation text into structured data and extract overall assessment"""
+    if not evaluation_text:
+        return pd.DataFrame(), ""
+    
+    # Split text into lines and find numbered criteria
+    lines = evaluation_text.split('\n')
+    criteria_data = []
+    overall_assessment = ""
+    
+    current_criterion = None
+    current_score = None
+    current_evaluation = []
+    collecting_overall = False
+    overall_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Check for overall assessment section
+        if re.search(r'overall|summary|conclusion|assessment|recommendation', line.lower()) and not re.match(r'^\d+\.\s+', line):
+            collecting_overall = True
+            overall_lines.append(line)
+            continue
+        
+        if collecting_overall:
+            overall_lines.append(line)
+            continue
+            
+        # Look for numbered criteria (1. 2. 3. etc.)
+        if re.match(r'^\d+\.\s+', line):
+            # Save previous criterion if exists
+            if current_criterion:
+                criteria_data.append({
+                    'Criterion': current_criterion,
+                    'Score': current_score or 'N/A',
+                    'Evaluation': ' '.join(current_evaluation)
+                })
+            
+            # Extract criterion name and score
+            parts = line.split(':')
+            if len(parts) >= 2:
+                criterion_part = parts[0]
+                rest = ':'.join(parts[1:]).strip()
+                
+                # Extract criterion name (remove number)
+                current_criterion = re.sub(r'^\d+\.\s+', '', criterion_part).strip()
+                
+                # Look for score in the rest
+                score_match = re.search(r'(\d+(?:\.\d+)?)/10|Score:\s*(\d+(?:\.\d+)?)', rest)
+                if score_match:
+                    current_score = score_match.group(1) or score_match.group(2)
+                else:
+                    current_score = 'N/A'
+                
+                # Start collecting evaluation text
+                current_evaluation = [rest]
+            else:
+                current_criterion = re.sub(r'^\d+\.\s+', '', line).strip()
+                current_score = 'N/A'
+                current_evaluation = []
+        else:
+            # Continue collecting evaluation text
+            if current_criterion and line and not collecting_overall:
+                current_evaluation.append(line)
+    
+    # Add the last criterion
+    if current_criterion:
+        criteria_data.append({
+            'Criterion': current_criterion,
+            'Score': current_score or 'N/A',
+            'Evaluation': ' '.join(current_evaluation)
+        })
+    
+    # Process overall assessment
+    if overall_lines:
+        overall_assessment = ' '.join(overall_lines)
+    
+    # If no structured data found, create a simple table
+    if not criteria_data:
+        # Try to extract any meaningful content
+        sentences = [s.strip() for s in evaluation_text.split('.') if s.strip()]
+        for i, sentence in enumerate(sentences[:10], 1):  # Limit to 10 items
+            criteria_data.append({
+                'Criterion': f'Point {i}',
+                'Score': 'N/A',
+                'Evaluation': sentence
+            })
+    
+    return pd.DataFrame(criteria_data), overall_assessment
+
+def generate_pdf_report(df, startup_info, result):
+    """Generate PDF report with proper formatting and colors"""
+    if not PDF_AVAILABLE:
+        return None
+    
+    buffer = BytesIO()
+    # Set creamy white background
+    doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                          leftMargin=0.75*inch, rightMargin=0.75*inch,
+                          topMargin=1*inch, bottomMargin=1*inch)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title with olive color
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        textColor=colors.HexColor('#808000'),  # Olive color
+        alignment=1  # Center alignment
+    )
+    story.append(Paragraph(f"Startup Evaluation Report: {startup_info['name']}", title_style))
+    story.append(Spacer(1, 12))
+    
+    # Startup info with olive text
+    info_style = ParagraphStyle(
+        'InfoStyle',
+        parent=styles['Normal'],
+        textColor=colors.HexColor('#808000'),  # Olive color
+        fontSize=11
+    )
+    story.append(Paragraph(f"<b>Industry:</b> {startup_info['industry']}", info_style))
+    story.append(Paragraph(f"<b>Founded:</b> {startup_info['founded_year']}", info_style))
+    story.append(Paragraph(f"<b>Funding:</b> {startup_info['funding']}", info_style))
+    story.append(Paragraph(f"<b>Evaluation Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", info_style))
+    story.append(Spacer(1, 20))
+    
+    # Table with proper text wrapping
+    if not df.empty:
+        table_data = [['Criterion', 'Score', 'Evaluation']]
+        for _, row in df.iterrows():
+            # Wrap text properly for PDF
+            criterion = Paragraph(str(row['Criterion']), ParagraphStyle('CellStyle', 
+                                 parent=styles['Normal'], fontSize=9, 
+                                 textColor=colors.HexColor('#808000')))
+            score = Paragraph(str(row['Score']), ParagraphStyle('CellStyle', 
+                            parent=styles['Normal'], fontSize=9, 
+                            textColor=colors.HexColor('#808000'), alignment=1))
+            evaluation = Paragraph(str(row['Evaluation']), ParagraphStyle('CellStyle', 
+                                 parent=styles['Normal'], fontSize=9, 
+                                 textColor=colors.HexColor('#808000')))
+            table_data.append([criterion, score, evaluation])
+        
+        # Adjust column widths for better text wrapping
+        table = Table(table_data, colWidths=[1.8*inch, 0.8*inch, 3.4*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808000')),  # Olive header
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#F5F5DC')),  # Creamy white text
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5DC')),  # Creamy white background
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#808000')),  # Olive grid lines
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+        ]))
+        story.append(table)
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 def display_final_report(result):
-    """Display the final evaluation report"""
+    """Display the final evaluation report in table format with mobile responsiveness"""
     st.subheader("🎯 Comprehensive Startup Evaluation")
     
     evaluation_text = result.get("evaluation", "No evaluation available")
     
-    # Display the evaluation in a nice format
-    st.markdown("### 📄 Evaluation Report")
-    st.text_area(
-        "",
-        value=evaluation_text,
-        height=600,
-        help="AI-generated comprehensive evaluation"
-    )
+    # Parse evaluation into table format and extract overall assessment
+    df, overall_assessment = parse_evaluation_to_table(evaluation_text)
     
-    # Download options
-    col1, col2, col3 = st.columns(3)
+    if not df.empty:
+        st.markdown("### 📊 Evaluation Results Table")
+        
+        # Add comprehensive mobile-responsive CSS
+        st.markdown("""
+        <style>
+        /* Mobile-first responsive design */
+        .stDataFrame {
+            font-size: 12px;
+            overflow-x: auto;
+            width: 100%;
+        }
+        
+        /* Mobile devices (up to 768px) */
+        @media (max-width: 768px) {
+            .stDataFrame {
+                font-size: 10px;
+            }
+            
+            .stDataFrame table {
+                min-width: 100%;
+                font-size: 10px;
+            }
+            
+            .stDataFrame th, .stDataFrame td {
+                padding: 4px 2px !important;
+                word-wrap: break-word;
+                white-space: normal;
+                max-width: 120px;
+            }
+            
+            /* Make evaluation column scrollable on mobile */
+            .stDataFrame td:last-child {
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        }
+        
+        /* Tablet devices (769px to 1024px) */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .stDataFrame {
+                font-size: 11px;
+            }
+            
+            .stDataFrame th, .stDataFrame td {
+                padding: 6px 4px !important;
+            }
+        }
+        
+        /* Desktop devices (1025px and up) */
+        @media (min-width: 1025px) {
+            .stDataFrame {
+                font-size: 12px;
+            }
+        }
+        
+        .stDataFrame [data-testid="stDataFrameResizeHandle"] {
+            display: block;
+        }
+        
+        .stDataFrame div[data-testid="column"] div[data-testid="stMarkdownContainer"] p {
+            word-wrap: break-word;
+            white-space: normal;
+        }
+        
+        /* Mobile-responsive overall assessment */
+        .overall-assessment-header {
+            color: #808000;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .overall-assessment-box {
+            background-color: #F5F5DC;
+            color: #808000;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #808000;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        
+        /* Mobile adjustments for overall assessment */
+        @media (max-width: 768px) {
+            .overall-assessment-header {
+                font-size: 16px;
+                margin-top: 20px;
+                margin-bottom: 10px;
+            }
+            
+            .overall-assessment-box {
+                padding: 12px;
+                font-size: 12px;
+                line-height: 1.5;
+                margin-bottom: 15px;
+            }
+        }
+        
+        /* Download buttons responsive layout */
+        @media (max-width: 768px) {
+            .stColumns {
+                flex-direction: column;
+            }
+            
+            .stColumns > div {
+                width: 100% !important;
+                margin-bottom: 10px;
+            }
+            
+            .stDownloadButton button {
+                width: 100%;
+                font-size: 12px;
+                padding: 8px;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Display table with mobile-optimized configuration
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            height=400,
+            column_config={
+                "Criterion": st.column_config.TextColumn(
+                    "Criterion",
+                    width="small",  # Smaller width for mobile
+                    help="Evaluation criterion"
+                ),
+                "Score": st.column_config.TextColumn(
+                    "Score",
+                    width="small"
+                ),
+                "Evaluation": st.column_config.TextColumn(
+                    "Assessment",  # Shorter header for mobile
+                    width="large",
+                    help="Scroll horizontally to view full content"
+                )
+            }
+        )
+        
+        # Display Overall Assessment below the table with mobile responsiveness
+        if overall_assessment:
+            st.markdown('<div class="overall-assessment-header">📋 Overall Assessment</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="overall-assessment-box">{overall_assessment}</div>', unsafe_allow_html=True)
+        
+    else:
+        # Fallback to original text display with mobile optimization
+        st.markdown("### 📄 Evaluation Report")
+        st.text_area(
+            "",
+            value=evaluation_text,
+            height=400,  # Reduced height for mobile
+            help="AI-generated comprehensive evaluation"
+        )
     
-    with col1:
+    # Mobile-responsive download options
+    st.markdown("### 📥 Download Options")
+    
+    # Check if we're on mobile (approximate)
+    is_mobile = st.session_state.get('is_mobile', False)
+    
+    if st.checkbox("📱 Mobile Layout", help="Check this for better mobile experience"):
+        # Stack download buttons vertically for mobile
         if st.download_button(
             label="📥 Download Report (TXT)",
             data=evaluation_text,
             file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-            mime="text/plain"
+            mime="text/plain",
+            use_container_width=True
         ):
             st.success("Report downloaded!")
-    
-    with col2:
-        # Create JSON export
+        
+        if not df.empty:
+            csv_data = df.to_csv(index=False)
+            if st.download_button(
+                label="📊 Download CSV",
+                data=csv_data,
+                file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            ):
+                st.success("CSV downloaded!")
+        
+        # PDF download
+        if not df.empty:
+            try:
+                if PDF_AVAILABLE:
+                    pdf_data = generate_pdf_report(df, st.session_state.startup_info, result)
+                    if pdf_data and st.download_button(
+                        label="📄 Download PDF",
+                        data=pdf_data,
+                        file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    ):
+                        st.success("PDF downloaded!")
+                else:
+                    st.button("📄 Download PDF", disabled=True, help="ReportLab not installed", use_container_width=True)
+            except Exception as e:
+                st.button("📄 Download PDF", disabled=True, help=f"Error: {str(e)}", use_container_width=True)
+        
+        # JSON download
         full_data = {
             "startup_info": st.session_state.startup_info,
-            "questions": st.session_state.questions,
-            "answers": st.session_state.answers,
             "evaluation": evaluation_text,
-            "method_used": result["method_used"],
-            "timestamp": result["timestamp"]
+            "timestamp": datetime.now().isoformat()
         }
-        
         if st.download_button(
-            label="📊 Download Full Data (JSON)",
+            label="📋 Download JSON",
             data=json.dumps(full_data, indent=2),
-            file_name=f"{st.session_state.startup_info['name']}_full_data_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-            mime="application/json"
+            file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+            mime="application/json",
+            use_container_width=True
         ):
-            st.success("Full data exported!")
+            st.success("JSON downloaded!")
     
-    with col3:
-        if st.button("🔄 Generate New Evaluation"):
-            st.session_state.evaluation_result = None
-            st.rerun()
+    else:
+        # Desktop layout with columns
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            if st.download_button(
+                label="📥 Download Report (TXT)",
+                data=evaluation_text,
+                file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                mime="text/plain"
+            ):
+                st.success("Report downloaded!")
+        
+        with col2:
+            if not df.empty:
+                csv_data = df.to_csv(index=False)
+                if st.download_button(
+                    label="📊 Download CSV",
+                    data=csv_data,
+                    file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv"
+                ):
+                    st.success("CSV downloaded!")
+        
+        with col3:
+            if not df.empty:
+                try:
+                    if PDF_AVAILABLE:
+                        pdf_data = generate_pdf_report(df, st.session_state.startup_info, result)
+                        if pdf_data and st.download_button(
+                            label="📄 Download PDF",
+                            data=pdf_data,
+                            file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                            mime="application/pdf"
+                        ):
+                            st.success("PDF downloaded!")
+                    else:
+                        st.button("📄 Download PDF", disabled=True, help="ReportLab not installed")
+                except Exception as e:
+                    st.button("📄 Download PDF", disabled=True, help=f"Error: {str(e)}")
+        
+        with col4:
+            full_data = {
+                "startup_info": st.session_state.startup_info,
+                "evaluation": evaluation_text,
+                "timestamp": datetime.now().isoformat()
+            }
+            if st.download_button(
+                label="📋 Download JSON",
+                data=json.dumps(full_data, indent=2),
+                file_name=f"{st.session_state.startup_info['name']}_evaluation_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                mime="application/json"
+            ):
+                st.success("JSON downloaded!")
+    
+    # Generate new evaluation button
+    if st.button("🔄 Generate New Evaluation", use_container_width=True):
+        st.session_state.evaluation_result = None
+        st.rerun()
 
 def display_technical_details(result):
-    """Display technical details"""
+    """Display technical details with fixed text color"""
+    # Add CSS to fix text color in technical details
+    st.markdown("""
+    <style>
+    .technical-details {
+        color: #808000 !important; /* Olive color */
+    }
+    .technical-details h3 {
+        color: #3D5A40 !important;
+    }
+    .technical-details .stMetric {
+        color: #808000 !important;
+    }
+    .technical-details .stMetric > div {
+        color: #808000 !important;
+    }
+    .technical-details .stMetric label {
+        color: #808000 !important;
+    }
+    .technical-details .stMetric [data-testid="metric-container"] {
+        color: #808000 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="technical-details">', unsafe_allow_html=True)
     st.subheader("🔧 Technical Processing Details")
     
     # Processing info
@@ -786,6 +1238,8 @@ def display_technical_details(result):
         )
         
         st.info("💡 The final report above combines this raw output with Groq Llama 70B enhancement for better structure and analysis.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def display_qa_summary():
     """Display Q&A summary"""
