@@ -475,3 +475,32 @@ a:hover {
     0% { opacity: 1; }
     100% { opacity: 0; visibility: hidden; }
 }
+
+/* ==== Fix Browser Autocomplete Styling ==== */
+.stTextInput>div>div>input:-webkit-autofill,
+.stTextInput>div>div>input:-webkit-autofill:hover,
+.stTextInput>div>div>input:-webkit-autofill:focus,
+.stTextInput>div>div>input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #FFFFFF inset !important;
+    -webkit-text-fill-color: #2C2C2C !important;
+    background-color: #FFFFFF !important;
+    border: 2px solid #E6E6E6 !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* For other browsers */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #FFFFFF inset !important;
+    -webkit-text-fill-color: #2C2C2C !important;
+    background-color: #FFFFFF !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Additional override for autocomplete dropdown */
+input:autofill {
+    background-color: #FFFFFF !important;
+    color: #2C2C2C !important;
+}
